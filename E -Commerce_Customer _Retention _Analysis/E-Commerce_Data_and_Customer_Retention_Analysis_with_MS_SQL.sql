@@ -13,7 +13,7 @@ SELECT
 		C.Customer_Segment,
 		
 		P.Prod_Main_id,
-		P.Product_Sub_Category,
+		P.Product_Sub_Category,                                                                    
 				
 		O.Order_Date,
 		O.Order_Priority,
@@ -96,7 +96,7 @@ AND		DATEDIFF(DAY, first_order, third_order) IS NOT NULL
 -- 7. Write a query that returns customers who purchased both product 11 and product 14, 
 -- as well as the ratio of these products to the total number of products purchased by the customer.
 
-CREATE VIEW cust_order_products
+/*CREATE VIEW cust_order_products
 AS
 
 SELECT	Ord_id, Cust_id, Prod_id,
@@ -117,13 +117,27 @@ WHERE Cust_id IN
 GROUP BY Ord_id, Cust_id, Prod_id, Order_Quantity
 ;
 
-SELECT		Cust_id, Prod_id,
+SELECT	    Cust_id, Prod_id,
 			CAST((1.0 * Order_Product_Quantity / Total_Product_Quantity) AS NUMERIC(4,2)) Product_Ratio
 FROM		cust_order_products
 WHERE		Prod_id IN (11, 14)
 ORDER BY	Cust_id
 ;
-
+*/
+WITH tab1 as (
+Select Cust_id ,
+		SUM(CASE WHEN Prod_id = 11 THEN order_quantity else 0 end) sum_prod11,
+		SUM(CASE WHEN Prod_id = 14 THEN order_quantity else 0 end) sum_prod14,
+		SUM (Order_Quantity) sum_prod
+FROM combined_table
+group by Cust_id
+having SUM(CASE WHEN Prod_id = 11 THEN order_quantity else 0 end) >=1
+		and SUM(CASE WHEN Prod_id = 14 THEN order_quantity else 0 end) >=1
+		)
+SELECT Cust_id,sum_prod11,sum_prod14,	
+		CAST (1.0*sum_prod11/ sum_prod AS NUMERIC (3,2)) AS ratıo_p11,
+		CAST (1.0*sum_prod14/ sum_prod AS NUMERIC (3,2)) AS ratıo_p14
+FROM tab1;
 
 -- Customer Segmentation --
 -- Categorize customers based on their frequency of visits. --
@@ -160,10 +174,12 @@ FROM [dbo].[Monthly_visit]
 
 -- 3. For each visit of customers, create the next month of the visit as a separate column.
 
-SELECT	DISTINCT Cust_id,First_name, Last_name, YEAR(Order_Date) as Order_year, Month(Order_Date) as Order_month,
-		LEAD(MONTH(Order_Date)) OVER(PARTITION BY Cust_id ORDER BY Order_Date) next_visit
-FROM	combined_table
-Group by Cust_id, First_name, Last_name, Order_Date
+	SELECT	DISTINCT Cust_id,First_name, Last_name, 
+						YEAR(Order_Date) as Order_year, 
+						Month(Order_Date) as Order_month,
+						LEAD(Order_Date) OVER(PARTITION BY Cust_id ORDER BY Order_Date) next_visit
+	FROM	combined_table
+	Group by Cust_id, First_name, Last_name, Order_Date
 ;
 
 
@@ -201,7 +217,7 @@ CREATE VIEW total_avg_gap
 AS
 SELECT AVG(avg_time_gap*1.0) avg_gap
 FROM(
-SELECT Cust_id, AVG( time_gap ) avg_time_gap
+	 SELECT Cust_id, AVG( time_gap ) avg_time_gap
 	 FROM  time_gaps
 	 GROUP BY Cust_id) A
 ;
@@ -231,7 +247,11 @@ where	time_gap =1
  ;
  --DROP VIEW IF EXISTS retention_month_vise
  SELECT * FROM RetentionMonthWise;
-
+ ------
+ --SELECT		COUNT(Retention_Month) Montly_Retained_Customers
+--FROM		retention_month_wise
+--GROUP BY	time_gap
+;
 --
 
 /*2. Calculate the month-wise retention rate.
@@ -285,5 +305,5 @@ SELECT  A.*, B.toplamret,
 FROM    Year_Month_Cust A, Toplamretinsayisi3 B
 WHERE   A.Yearly = B.Year_of_Order AND A.Monthly = B.Month_of_Order
 )
-SELECT Yearly, Monthly,MonthlyCustomer,toplamret, CAST(retention AS NUMERIC (3,2)) as Retention_Rate
+SELECT Yearly, Monthly,MonthlyCustomer,toplamret,  CAST(retention AS NUMERIC (3,2)) as Retention_Rate
 FROM ret_table
